@@ -46,7 +46,7 @@ async def generate_image(req: GenerateImageRequest):
             "height": 512,
         }
 
-        # タイムアウトを60秒に設定（CPUモード向け）
+        # タイムアウトを60秒に設定
         async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
             response = await client.post(f"{STABLE_DIFFUSION_API}/sdapi/v1/txt2img", json=payload)
             result = response.json()
