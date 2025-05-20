@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
-        canvas: false, // ← 必須
+        canvas: false,
       };
     }
     return config;

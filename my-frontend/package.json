@@ -14,9 +14,11 @@
     "@mui/icons-material": "^7.1.0",
     "@mui/material": "^7.1.0",
     "@mui/styled-engine-sc": "^7.1.0",
+    "@tailwindcss/vite": "^4.1.6",
     "canvas": "^3.1.0",
     "konva": "^9.3.20",
     "next": "15.3.2",
+    "postcss": "^8.5.3",
     "react": "^19.0.0",
     "react-color-palette": "^7.3.0",
     "react-dom": "^19.0.0",
@@ -26,14 +28,16 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
+    "@tailwindcss/postcss": "^4.1.7",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/webpack": "^5.28.5",
+    "autoprefixer": "^10.4.21",
     "eslint": "^9",
     "eslint-config-next": "15.3.2",
-    "tailwindcss": "^4",
+    "sass": "^1.88.0",
+    "tailwindcss": "^4.1.7",
     "typescript": "^5"
   }
 }

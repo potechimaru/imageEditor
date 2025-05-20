@@ -3,7 +3,7 @@
 
 import dynamic from 'next/dynamic';
 
-const FreeDrawingComponent = dynamic(() => import('./index'), {
+const FreeDrawingComponent = dynamic(() => import('../../app/index'), {
   ssr: false,
 });
 
