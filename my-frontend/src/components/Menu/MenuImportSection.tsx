@@ -9,11 +9,12 @@ interface Props {
   setCurrentIndex: (index: number) => void;
   previewUrls: string[];
   setPreviewUrls: Dispatch<SetStateAction<string[]>>;
+  setImportedUrls: Dispatch<SetStateAction<string[]>>;
 }
 
 const sections = ['import', 'mask', 'export'] as const;
 
-const MenuImportSection = ({ currentIndex, setCurrentIndex ,previewUrls, setPreviewUrls }: Props) => {
+const MenuImportSection = ({ currentIndex, setCurrentIndex ,previewUrls, setPreviewUrls, setImportedUrls }: Props) => {
   const handlePrev = () => {
     if(currentIndex == 0) setCurrentIndex(sections.length - 1);
     else setCurrentIndex(currentIndex - 1);
@@ -30,7 +31,13 @@ const MenuImportSection = ({ currentIndex, setCurrentIndex ,previewUrls, setPrev
         <p className="text-xl -translate-y-0.5 mx-4">インポート</p>
         <ArrowForwardIosIcon className="scale-95 cursor-pointer" onClick={handleNext} />
       </div>
-      <ImageUploadPreview  previewUrls={previewUrls} setPreviewUrls={setPreviewUrls}/>
+      <ImageUploadPreview
+        previewUrls={previewUrls}
+        setPreviewUrls={setPreviewUrls}
+        onImport={(url) => {
+          setImportedUrls((prev) => [...prev, url]);
+        }}
+      />
     </div>
   );
 };

@@ -11,13 +11,16 @@ import MenuExportSection from "@/components/Menu/MenuExportSection";
 import DrawingCanvas from "@/components/DrawingComponent/DrawingCanvas";
 
 const FreeDrawingComponent = () => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);  // インポート、エクスポート、マスク画像のメニューを意味する一意の数 
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]); // インポート画面に表示する画像のURL
+  const [importedUrls, setImportedUrls] = useState<string[]>([]); // Canvasに表示する画像のURL
+  const [exportedUrls, setExportedUrls] = useState<string[]>([]);
+
   const sectionComponents = [
     () => <MenuImportSection currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} 
-          previewUrls={previewUrls} setPreviewUrls={setPreviewUrls}/>,
+          previewUrls={previewUrls} setPreviewUrls={setPreviewUrls} setImportedUrls={setImportedUrls}/>,
     () => <MenuMaskSection currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} />,
-    () => <MenuExportSection currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} />,
+    () => <MenuExportSection currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} exportedUrls={exportedUrls} setExportedUrls={setExportedUrls}/>,
   ];
   return (
     <div>
@@ -28,9 +31,9 @@ const FreeDrawingComponent = () => {
           </div>
         ))}
       </div>
-        <DrawingCanvas previewUrls={previewUrls} />
+        <DrawingCanvas importedUrls={importedUrls} />
       <div>
-          <PromptInput></PromptInput>
+          <PromptInput setExportedUrls={setExportedUrls} /> {/*プロンプトを入力する欄*/}
       </div>
     </div>
     

@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from "react";
 import { useImages } from '../Hooks/UseImages';
 import { Stage, Layer, Line } from "react-konva";
 import { Image as KonvaImage } from "react-konva";
+import { Transformer } from 'react-konva';
+import Konva from 'konva';
 import { KonvaEventObject } from "konva/lib/Node";
 import { ColorPicker, useColor } from "react-color-palette";
 import type { Stage as KonvaStage } from 'konva/lib/Stage';
@@ -19,6 +21,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import LineWeightIcon from "@mui/icons-material/LineWeight";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import UndoIcon from "@mui/icons-material/Undo";
+import AdsClickIcon from '@mui/icons-material/AdsClick';
 import { LuPencil, LuEraser, LuPalette } from "react-icons/lu";
 
 import "@/css/style.css";
@@ -31,18 +34,22 @@ type LineData = {
 };
 
 interface Props {
-  previewUrls: string[];
+  importedUrls: string[];       // ← これだけ描画
 }
 
-const DrawingCanvas = ({ previewUrls }: Props) => {
+const DrawingCanvas = ({ importedUrls }: Props) => {
 
-    const images = useImages(previewUrls);
-
+    const images = useImages(importedUrls);
     const [tool, setTool] = useState("pen");
     const [lines, setLines] = useState<LineData[]>([]);
+    const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+
     const isDrawing = useRef(false);
+    const imageRefs = useRef<(Konva.Image | null)[]>([]);
   
     const handleMouseDown = (e: KonvaEventObject<MouseEvent>) => {
+      if (tool === "drag") return;
+
       const stage = e.target.getStage();
       const position = stage?.getPointerPosition();
       if (!position) return;
@@ -61,6 +68,7 @@ const DrawingCanvas = ({ previewUrls }: Props) => {
 
     const handleMouseMove = (e: KonvaEventObject<MouseEvent>) => {
     if (!isDrawing.current) return;
+    if (tool === "drag") return;
 
     const stage = e.target.getStage();
     const position = stage?.getPointerPosition();
@@ -77,6 +85,8 @@ const DrawingCanvas = ({ previewUrls }: Props) => {
   };
 
   const handleTouchStart = (e: KonvaEventObject<TouchEvent>) => {
+    if (tool === "drag") return;
+
     e.evt.preventDefault();
     const stage = e.target.getStage();
     const point = stage?.getPointerPosition();
@@ -95,6 +105,8 @@ const DrawingCanvas = ({ previewUrls }: Props) => {
   };
 
   const handleTouchMove = (e: KonvaEventObject<TouchEvent>) => {
+    if (tool === "drag") return;
+
     e.evt.preventDefault();
     if (!isDrawing.current) return;
 
@@ -166,51 +178,12 @@ const DrawingCanvas = ({ previewUrls }: Props) => {
 
   return (
     <div className="free-drawing-container">
-        <Stage
-          style={{ border: "1px solid black", borderRadius: "32px" }}
-          width={window.innerWidth * 0.6}
-          height={window.innerHeight * 0.6}
-          onMouseDown={handleMouseDown}
-          onMousemove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          ref={stageRef}
-        >
-          <Layer>
-            {/* 画像の表示（ドラッグ可能） */}
-            {images.map((img, i) =>
-              img ? (
-                <KonvaImage
-                  key={i}
-                  image={img}
-                  x={50 + i * 40}
-                  y={50 + i * 40}
-                  draggable
-                />
-              ) : null
-            )}
-
-            {/* 描画ラインの描画 */}
-            {lines.map((line, i) => (
-              <Line
-                key={i}
-                points={line.points}
-                stroke={line.color}
-                strokeWidth={line.strokeWidth}
-                tension={0.5}
-                lineCap="round"
-                lineJoin="round"
-                globalCompositeOperation={
-                  line.tool === "eraser" ? "destination-out" : "source-over"
-                }
-              />
-            ))}
-          </Layer>
-
-        </Stage>
-        <div className="toolbar">
+      <div className="toolbar">
+          <Tooltip title="画像をドラッグ" placement="top">
+            <IconButton onClick={() => onClickChangeTool("drag")}>
+              <AdsClickIcon color={tool === "drag" ? "primary" : "inherit"} />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="戻す" placement="top">
             <IconButton onClick={handleUndo}>
               <UndoIcon />
@@ -283,8 +256,77 @@ const DrawingCanvas = ({ previewUrls }: Props) => {
             </IconButton>
           </Tooltip>
         </div>
+        <Stage
+          style={{ border: "1px solid black", borderRadius: "32px" }}
+          width={window.innerWidth * 0.5}
+          height={window.innerHeight * 0.7}
+          onMouseDown={handleMouseDown}
+          onMousemove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          ref={stageRef}
+        >
+          <Layer>
+            {/* 画像の表示（ドラッグ可能） */}
+            {images.map((img, i) =>
+            img ? (
+              <KonvaImage
+                key={i}
+                image={img}
+                x={50 + i * 40}
+                y={50 + i * 40}
+                draggable={tool === "drag"}
+                onClick={() => setSelectedImageIndex(i)}
+                ref={(node) => {
+                  if (i === selectedImageIndex) imageRefs.current[i] = node;
+                }}
+              />
+            ) : null
+            )}
+
+            {selectedImageIndex !== null && (
+              <Transformer
+                ref={(node) => {
+                  if (node && imageRefs.current[selectedImageIndex]) {
+                    node.nodes([imageRefs.current[selectedImageIndex]]);
+                    node.getLayer()?.batchDraw(); // リフレッシュ
+                  }
+                }}
+                rotateEnabled={true}
+                enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+              />
+            )}
+
+
+            {/* 描画ラインの描画 */}
+            {lines.map((line, i) => (
+              <Line
+                key={i}
+                points={line.points}
+                stroke={line.color}
+                strokeWidth={line.strokeWidth}
+                tension={0.5}
+                lineCap="round"
+                lineJoin="round"
+                globalCompositeOperation={
+                  line.tool === "eraser" ? "destination-out" : "source-over"
+                }
+              />
+            ))}
+          </Layer>
+
+        </Stage>
         <div className="tool-info">
-          <Typography>現在のツール：{tool === "pen" ? "ペン" : "消しゴム"}</Typography>
+          <Typography>
+            現在のツール：
+            {{
+              pen: "ペン",
+              eraser: "消しゴム",
+              drag: "画像ドラッグ"
+            }[tool]}
+          </Typography>
           <Typography>ツールの太さ：{lineWeight}</Typography>
           {tool === "pen" && (
               <Typography

@@ -5,15 +5,15 @@ import type { Dispatch, SetStateAction } from 'react';
 interface Props {
   previewUrls: string[];
   setPreviewUrls: Dispatch<SetStateAction<string[]>>;
+  onImport: (url: string) => void;
 }
 
-export default function ImageUploadPreview({ previewUrls, setPreviewUrls }: Props) {
+export default function ImageUploadPreview({ previewUrls, setPreviewUrls, onImport }: Props) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
-    const fileArray = Array.from(files);
-    fileArray.forEach((file) => {
+    Array.from(files).forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const newUrl = reader.result as string;
@@ -38,10 +38,18 @@ export default function ImageUploadPreview({ previewUrls, setPreviewUrls }: Prop
         </label>
       </div>
 
-      {/* プレビュー表示 */}
+      {/*グリッドレイアウト*/}
       <div className="grid grid-cols-3 gap-2">
         {previewUrls.map((url, i) => (
-          <Image key={i} src={url} alt={`preview-${i}`} width={100} height={100} />
+          <Image
+            key={i}
+            src={url}
+            alt={`preview-${i}`}
+            width={100}
+            height={100}
+            className="border rounded shadow cursor-pointer hover:opacity-80 transition"
+            onClick={() => onImport(url)}
+          />
         ))}
       </div>
     </div>
