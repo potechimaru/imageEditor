@@ -49,19 +49,25 @@ class AdjustPromptResponse(BaseModel):
     adjusted_prompt: str
 
 # ============================
-# 画像生成API
+# 定数
 # ============================
 
 STABLE_DIFFUSION_API = "http://127.0.0.1:7860"
+ANYTHING_MODEL_NAME = "AnythingXL_xl.safetensors"
+
+# ============================
+# 画像生成API
+# ============================
 
 @app.post("/api/generate_image", response_model=GenerateImageResponse)
 async def generate_image(req: GenerateImageRequest):
     try:
         payload = {
             "prompt": req.prompt,
-            "steps": 20,
-            "width": 512,
-            "height": 512,
+            "steps": 30,
+            "width": 1024,
+            "height": 1024,
+            "sampler_name": "DPM++ 2M Karras"
         }
 
         async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
@@ -69,10 +75,10 @@ async def generate_image(req: GenerateImageRequest):
             result = response.json()
 
         if "images" not in result:
-            return {
-                "error": "WebUI returned invalid response",
-                "raw_response": result
-            }
+            return JSONResponse(
+                status_code=500,
+                content={ "error": "WebUI returned invalid response", "raw_response": result }
+            )
 
         image_base64 = result["images"][0]
         image_data = base64.b64decode(image_base64)
@@ -87,10 +93,10 @@ async def generate_image(req: GenerateImageRequest):
         return GenerateImageResponse(image_url=image_url)
 
     except Exception as e:
-        return {
-            "error": str(e),
-            "trace": traceback.format_exc()
-        }
+        return JSONResponse(
+            status_code=500,
+            content={ "error": str(e), "trace": traceback.format_exc() }
+        )
 
 # ============================
 # プロンプト補正API（Gemini使用）
@@ -99,31 +105,26 @@ async def generate_image(req: GenerateImageRequest):
 @app.post("/api/adjust_prompt", response_model=AdjustPromptResponse)
 async def adjust_prompt(req: AdjustPromptRequest):
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
         model = genai.GenerativeModel("models/gemini-1.5-flash")
-
         prompt = f"""
-        Convert the following Japanese image description into a Stable Diffusion prompt (in English).
-        Just return one short high-quality result. No options or extra commentary.
+        Convert the following Japanese anime-style image description into a short, high-quality Stable Diffusion XL prompt in English.
+        Focus on anime/manga illustration tone, detailed face, colorful eyes, high resolution. Return only the prompt.
 
         Input: {req.input_prompt}
         """
-
         response = model.generate_content(prompt)
         result = response.text.strip()
 
         return AdjustPromptResponse(adjusted_prompt=result)
 
     except Exception as e:
-        return {
-            "error": str(e),
-            "trace": traceback.format_exc()
-        }
+        return JSONResponse(
+            status_code=500,
+            content={ "error": str(e), "trace": traceback.format_exc() }
+        )
 
 # ============================
-# API
+# フル自動（プロンプト補正＋生成）
 # ============================
 
 @app.post("/api/full_generate", response_model=GenerateImageResponse)
@@ -132,31 +133,38 @@ async def full_generate(req: AdjustPromptRequest):
         # Geminiでプロンプト補正
         model = genai.GenerativeModel("models/gemini-1.5-flash")
         gemini_prompt = f"""
-        Convert the following Japanese image description into a Stable Diffusion prompt (in English).
-        Just return one short high-quality result. No options or extra commentary.
+        Convert the following Japanese anime-style image description into a short, high-quality Stable Diffusion XL prompt in English.
+        Focus on anime/manga illustration tone, detailed face, colorful eyes, high resolution. Return only the prompt.
 
         Input: {req.input_prompt}
         """
         gemini_response = model.generate_content(gemini_prompt)
         adjusted_prompt = gemini_response.text.strip()
 
+        # モデルをAnythingXLに切り替え
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+            await client.post(f"{STABLE_DIFFUSION_API}/sdapi/v1/options", json={
+                "sd_model_checkpoint": ANYTHING_MODEL_NAME
+            })
+
         # Stable Diffusionで画像生成
         payload = {
             "prompt": adjusted_prompt,
             "steps": 20,
             "width": 512,
-            "height": 512,
+            "height": 768,
+            "sampler_name": "DPM++ 2M Karras"
         }
 
-        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
             response = await client.post(f"{STABLE_DIFFUSION_API}/sdapi/v1/txt2img", json=payload)
             result = response.json()
 
         if "images" not in result:
-            return {
-                "error": "WebUI returned invalid response",
-                "raw_response": result
-            }
+            return JSONResponse(
+                status_code=500,
+                content={ "error": "WebUI returned invalid response", "raw_response": result }
+            )
 
         image_base64 = result["images"][0]
         image_data = base64.b64decode(image_base64)
@@ -171,7 +179,7 @@ async def full_generate(req: AdjustPromptRequest):
         return GenerateImageResponse(image_url=image_url)
 
     except Exception as e:
-        return {
-            "error": str(e),
-            "trace": traceback.format_exc()
-        }
+        return JSONResponse(
+            status_code=500,
+            content={ "error": str(e), "trace": traceback.format_exc() }
+        )

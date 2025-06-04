@@ -33,6 +33,7 @@ const FreeDrawingComponent = () => {
       </div>
         <DrawingCanvas importedUrls={importedUrls} />
       <div>
+        
           <PromptInput setExportedUrls={setExportedUrls} /> {/*プロンプトを入力する欄*/}
       </div>
     </div>
