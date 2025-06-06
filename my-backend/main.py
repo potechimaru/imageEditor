@@ -64,9 +64,9 @@ async def generate_image(req: GenerateImageRequest):
     try:
         payload = {
             "prompt": req.prompt,
-            "steps": 30,
-            "width": 1024,
-            "height": 1024,
+            "steps": 20,
+            "width": 512,
+            "height": 768,
             "sampler_name": "DPM++ 2M Karras"
         }
 

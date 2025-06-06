@@ -5,8 +5,8 @@ import ImageUploadPreview from '../DrawingComponent/ImageUploadPreview';
 import type { Dispatch, SetStateAction } from 'react';
 
 interface Props {
-  currentIndex: number;
-  setCurrentIndex: (index: number) => void;
+  leftPanelCurrentIndex: number;
+  setLeftPanelCurrentIndex: (index: number) => void;
   previewUrls: string[];
   setPreviewUrls: Dispatch<SetStateAction<string[]>>;
   setImportedUrls: Dispatch<SetStateAction<string[]>>;
@@ -14,14 +14,14 @@ interface Props {
 
 const sections = ['import', 'mask', 'export'] as const;
 
-const MenuImportSection = ({ currentIndex, setCurrentIndex ,previewUrls, setPreviewUrls, setImportedUrls }: Props) => {
+const MenuImportSection = ({ leftPanelCurrentIndex, setLeftPanelCurrentIndex ,previewUrls, setPreviewUrls, setImportedUrls }: Props) => {
   const handlePrev = () => {
-    if(currentIndex == 0) setCurrentIndex(sections.length - 1);
-    else setCurrentIndex(currentIndex - 1);
+    if(leftPanelCurrentIndex == 0) setLeftPanelCurrentIndex(sections.length - 1);
+    else setLeftPanelCurrentIndex(leftPanelCurrentIndex - 1);
   };
   const handleNext = () => {
-    if(currentIndex == sections.length - 1) setCurrentIndex(0);
-    else setCurrentIndex(currentIndex + 1);
+    if(leftPanelCurrentIndex == sections.length - 1) setLeftPanelCurrentIndex(0);
+    else setLeftPanelCurrentIndex(leftPanelCurrentIndex + 1);
   };
 
   return (

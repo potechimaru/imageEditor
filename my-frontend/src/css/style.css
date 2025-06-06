@@ -1,37 +1,5 @@
-.free-drawing-container {
-  display: flex;
-  flex-direction: column;
-  align-items: space-between;
-  justify-content: center;
-  gap: 32px;
-  margin-top: 32px;
-}
 
-.toolbar {
-  width: min-content;
-  display: flex;
-  flex-direction: row;
-  gap: 16px;
-  margin-inline: auto;
-  padding-inline: 32px;
-  border: 1px solid black;
-  border-radius: 32px;
-  justify-content: center;
-}
 
 .menu-list {
   margin-top: 16px;
-}
-
-.tool-info {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  gap: 32px;
-  margin-inline: auto;
-}
-
-.rcp-root {
-  max-width: 1440px;
-  margin-inline: auto;
 }
