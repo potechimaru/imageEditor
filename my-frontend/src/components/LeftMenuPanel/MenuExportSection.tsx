@@ -9,11 +9,12 @@ interface Props {
   setLeftPanelCurrentIndex: (index: number) => void;
   exportedUrls: string[];
   setExportedUrls: Dispatch<React.SetStateAction<string[]>>;
+  onImport: (url: string) => void;
 }
 
 const sections = ['import', 'mask', 'export'] as const;
 
-const MenuExportSection = ({ leftPanelCurrentIndex, setLeftPanelCurrentIndex, exportedUrls }: Props) => {
+const MenuExportSection = ({ leftPanelCurrentIndex, setLeftPanelCurrentIndex, exportedUrls, onImport }: Props) => {
 
   const handlePrev = () => {
     if (leftPanelCurrentIndex === 0) setLeftPanelCurrentIndex(sections.length - 1);
@@ -42,6 +43,7 @@ const MenuExportSection = ({ leftPanelCurrentIndex, setLeftPanelCurrentIndex, ex
             width={100}
             height={100}
             className="border rounded shadow"
+            onClick={() => onImport(url)}
           />
         ))}
       </div>

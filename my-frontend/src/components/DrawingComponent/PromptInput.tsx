@@ -1,12 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { Dispatch, SetStateAction, useState } from 'react';
 
 interface Props {
-  setExportedUrls: React.Dispatch<React.SetStateAction<string[]>>;
+  setExportedUrls: Dispatch<SetStateAction<string[]>>;
+  steps: number;
+  width: number;
+  height: number;
+  style: string;
+  generatedPrompt: string;
+  setGeneratedPrompt: Dispatch<SetStateAction<string>>;
 }
 
-const PromptInput = ({ setExportedUrls }: Props) => {
+const PromptInput = ({ setExportedUrls, steps, width, height, style,  generatedPrompt, setGeneratedPrompt}: Props) => {
   const [message, setMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -16,16 +22,21 @@ const PromptInput = ({ setExportedUrls }: Props) => {
       const res = await fetch('http://localhost:8000/api/full_generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input_prompt: message }),
+        body: JSON.stringify({
+          prompt: message,
+          steps: steps,
+          width: width,
+          height: height,
+          style: style,
+        }),
       });
 
       const data = await res.json();
       const imageUrl = data.image_url;
       console.log('生成された画像URL:', imageUrl);
 
-      //  Exported用にのみ追加
       setExportedUrls(prev => [...prev, imageUrl]);
-
+      setGeneratedPrompt(data.adjusted_prompt); 
       alert(`画像生成完了！`);
 
     } catch (error) {
@@ -44,6 +55,12 @@ const PromptInput = ({ setExportedUrls }: Props) => {
           className="w-full border border-gray-300 rounded px-3 py-2"
         />
       </div>
+      {generatedPrompt && (
+        <div className="p-4 bg-gray-100 border rounded mt-4">
+          <p className="text-sm font-bold">補正後プロンプト:</p>
+          <p className="text-sm whitespace-pre-wrap">{generatedPrompt}</p>
+        </div>
+        )}
       <button
         type="submit"
         className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"

@@ -278,7 +278,7 @@ const DrawingCanvas = ({ importedUrls, stageRef, selectedImageIndex, setSelected
             }}
             className="menu-list"
           >
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((weight) => (
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 25].map((weight) => (
               <MenuItem key={weight} onClick={() => handleChangeLineWeight(weight)}>
                 {weight}
               </MenuItem>
