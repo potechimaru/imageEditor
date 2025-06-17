@@ -4,6 +4,7 @@ import uuid  # 画像ファイルに一意な名前をつけるために使用
 import traceback  # エラー発生時の詳細な情報を取得
 import httpx  # StableDiffusionWebUIへのリクエストに使う
 import google.generativeai as genai  #プロンプト補正用GeminiAPI
+import boto3  # AWS S3用
 
 from fastapi import FastAPI  # WebAPIを作る本体
 from fastapi.middleware.cors import CORSMiddleware  # Next.jsなど別ドメインからのアクセスを許可する
@@ -29,6 +30,30 @@ from dotenv import load_dotenv  # .envファイルからAPIキーを読み込む
 dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
 load_dotenv(dotenv_path)
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_REGION = os.getenv("AWS_REGION")
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+
+# S3クライアント作成
+s3_client = boto3.client(
+    's3',
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    region_name=AWS_REGION
+)
+
+# S3アップロード用共通関数
+def upload_to_s3(file_data: bytes, filename: str) -> str:
+    s3_client.put_object(
+        Bucket=S3_BUCKET_NAME,
+        Key=filename,
+        Body=file_data,
+        ContentType='image/png',
+        ACL='public-read'
+    )
+    url = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{filename}"
+    return url
 
 # FastAPIアプリの初期化
 app = FastAPI()
@@ -64,7 +89,7 @@ app.add_middleware(
 #/images = ブラウザからアクセスするURLパスのプレフィックス
 # StaticFiles(directory="images") = サーバーの images フォルダを静的ファイルとして提供
 # name="images" = このマウントに付ける内部名
-app.mount("/images", StaticFiles(directory="images"), name="images")
+# app.mount("/images", StaticFiles(directory="images"), name="images")
 
 # ============================
 # モデル定義
@@ -117,22 +142,23 @@ STABLE_DIFFUSION_API = "http://127.0.0.1:7860"
 ANYTHING_MODEL_NAME = "AnythingXL_xl.safetensors"
 
 # ============================
-# 画像生成API
+# 通常画像生成API（Geminiプロンプト補正付き）
 # ============================
 
 # FastAPI のルーティングデコレーター
-# HTTP POST リクエストを /api/generate_image に受け付ける
+# HTTP POST リクエストを /api/full_generate に受け付ける
 # POSTは主に「データを送って処理・保存してほしい」というリクエストに使用。
 
-# "/api/generate_image" = APIのエンドポイントURL
-# フロントエンドからのリクエスト先が http://localhost:8000/api/generate_image になる
+# "/api/full_generate" = APIのエンドポイントURL
+# フロントエンドからのリクエスト先が http://localhost:8000/api/full_generate になる
 
 # response_model=GenerateImageResponse
 # このエンドポイントのレスポンス（返却値）の形式を GenerateImageResponse として宣言
 # 返ってくるJSONは常に {"image_url": "...URL..."} のような形式に強制される
-@app.post("/api/generate_image", response_model=GenerateImageResponse)
+@app.post("/api/full_generate", response_model=GenerateImageResponse)
+
 # 内部で httpx.AsyncClient() を使って外部API（Stable Diffusion WebUI）に非同期リクエストを送るため、asyncである必要がある
-# generate_image = 関数名
+# full_generate = 関数名
 #
 # req: GenerateImageRequest
 # リクエストボディ（POSTデータ）を GenerateImageRequest 型で受け取る
@@ -140,11 +166,33 @@ ANYTHING_MODEL_NAME = "AnythingXL_xl.safetensors"
 # {
 #   "prompt": "a cute anime girl in blue dress"
 # }
-async def generate_image(req: GenerateImageRequest):
+async def full_generate(req: GenerateImageRequest):
     try:
-        # "sampler_name": "DPM++ 2M Karras" は、Stable Diffusion において画像を生成する際のサンプリング手法の指定をしている
+        model = genai.GenerativeModel("models/gemini-1.5-flash")
+        prompt = f"""
+        You are an expert in generating prompts for Stable Diffusion XL, using the AnythingXL model.
+
+        Convert the following Japanese image description into a high-quality English prompt for the img2img task.
+        Make the output a comma-separated list of visual tags and keywords (no full sentences).
+        Use the AnythingXL tag style (e.g., "1girl, long hair, blue eyes, school uniform, dynamic pose, masterpiece, high resolution").
+
+        Reflect the following style: {req.style}, fully rendered, complete, high quality
+        Keep structure and composition consistent with the input image.
+
+        Return only the comma-separated prompt, no extra explanation.
+
+        Input: {req.prompt}
+        """
+        gemini_response = model.generate_content(prompt)
+        adjusted_prompt = gemini_response.text.strip()
+
+        await httpx.AsyncClient().post(f"{STABLE_DIFFUSION_API}/sdapi/v1/options", json={
+            "sd_model_checkpoint": ANYTHING_MODEL_NAME
+        })
+
         payload = {
-            "prompt": req.prompt,
+            # "sampler_name": "DPM++ 2M Karras" は、Stable Diffusion において画像を生成する際のサンプリング手法の指定をしている
+            "prompt": adjusted_prompt,
             "steps": req.steps,
             "width": req.width,
             "height": req.height,
@@ -154,8 +202,8 @@ async def generate_image(req: GenerateImageRequest):
         # httpx.AsyncClient() は FastAPIと相性が良い 非同期HTTPクライアント（HTTPリクエストを送るためのオブジェクト)
         # with は Python のコンテキストマネージャ
         # リクエスト終了後に 自動でクライアントを閉じてくれる（リソースリーク防止)
-        # timeout=httpx.Timeout(300.0) により、リクエストのタイムアウト時間を 最大300秒（5分） に設定
-        async with httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as client:
+        # timeout=httpx.Timeout(600.0) により、リクエストのタイムアウト時間を 最大600秒（10分） に設定
+        async with httpx.AsyncClient(timeout=httpx.Timeout(600.0)) as client:
             # f"{STABLE_DIFFUSION_API}/sdapi/v1/txt2img" は Stable Diffusion WebUI の画像生成エンドポイント
             # json=payload によって、前段で作成したプロンプトなどの生成条件を送信
             response = await client.post(f"{STABLE_DIFFUSION_API}/sdapi/v1/txt2img", json=payload)
@@ -199,8 +247,7 @@ async def generate_image(req: GenerateImageRequest):
         # base64.b64decode(...) 
         # image_base64 のような「Base64文字列」→「元のバイナリ（画像）」に復元
         # image_data は、実際のPNGファイルなどの生の画像データになる
-        image_base64 = result["images"][0]
-        image_data = base64.b64decode(image_base64)
+        image_data = base64.b64decode(result["images"][0])
 
         # filename = f"{uuid.uuid4()}.png"
         # 重複しないファイル名を生成して .png 形式で保存するための文字列を作っている
@@ -210,148 +257,25 @@ async def generate_image(req: GenerateImageRequest):
         # 保存先のディレクトリ "images" に対して、生成したファイル名を結合し、絶対または相対パスとして有効なパス文字列を作成
         # 結果例↓
         # file_path = "images/d5e68b50-b2a2-498b-8429-913dd5f75f7f.png"
-        filename = f"{uuid.uuid4()}.png"
+        filename = f"{uuid.uuid4()}.png"  
         file_path = os.path.join("images", filename)
 
-        # with = コンテキストマネージャ。ファイルの自動クローズ処理を保証する
-        # wb = バイナリファイルを書き込む
-        # ファイルオブジェクトを変数 f に代入
-        with open(file_path, "wb") as f:
-            f.write(image_data)
+        # # with = コンテキストマネージャ。ファイルの自動クローズ処理を保証する
+        # # wb = バイナリファイルを書き込む
+        # # ファイルオブジェクトを変数 f に代入
+        # with open(file_path, "wb") as f:
+        #     f.write(image_data)
 
         # image_url = f"http://localhost:8000/images/{filename}"
         # 保存した画像をWebブラウザやNext.jsフロントエンドから取得できるURLを構築
-        image_url = f"http://localhost:8000/images/{filename}"
-        return GenerateImageResponse(image_url=image_url)
+        # image_url = f"http://localhost:8000/images/{filename}"
+        
+        image_url = upload_to_s3(image_data, filename)
+        return GenerateImageResponse(image_url=image_url, adjusted_prompt=adjusted_prompt)
 
     # Exception はすべての標準的な例外の親クラス
     # as e によって発生した例外インスタンスを e で受け取る
     # traceback 情報は 開発中は便利だが、本番環境ではセキュリティ上の理由で含めない方が良い
-    except Exception as e:
-        return JSONResponse(status_code=500, content={ "error": str(e), "trace": traceback.format_exc() })
-
-# ============================
-# マスク付き画像生成API
-# ============================
-
-@app.post("/api/masked_generate", response_model=GenerateImageResponse)
-async def masked_generate(req: MaskedGenerateRequest):
-    try:
-        # 画像データの取得（base64形式）
-        original_image = req.original_base64
-        mask_image = req.mask_base64
-
-        payload = {
-            "prompt": req.prompt,
-            "init_images": [original_image],
-            "mask": mask_image,
-            "inpainting_fill": 1,  # 1: original（塗りつぶしなし）
-            "steps": 20,
-            "width": 512,
-            "height": 768,
-            "sampler_name": "DPM++ 2M Karras",
-            "denoising_strength": 0.75  # 元画像に対する変更の強さ
-        }
-
-        async with httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as client:
-            response = await client.post(f"{STABLE_DIFFUSION_API}/sdapi/v1/img2img", json=payload)
-            result = response.json()
-
-        if "images" not in result:
-            return JSONResponse(status_code=500, content={"error": "WebUI returned invalid response", "raw_response": result})
-
-        image_data = base64.b64decode(result["images"][0])
-        filename = f"{uuid.uuid4()}.png"
-        file_path = os.path.join("images", filename)
-
-        with open(file_path, "wb") as f:
-            f.write(image_data)
-
-        image_url = f"http://localhost:8000/images/{filename}"
-        return GenerateImageResponse(image_url=image_url)
-
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e), "trace": traceback.format_exc()})
-
-
-# ============================
-# プロンプト補正API
-# ============================
-
-@app.post("/api/adjust_prompt", response_model=AdjustPromptResponse)
-async def adjust_prompt(req: AdjustPromptRequest):
-    try:
-        model = genai.GenerativeModel("models/gemini-1.5-flash")
-        prompt = f"""
-        Convert the following Japanese image description into a short, high-quality prompt in English for Stable Diffusion XL using the AnythingXL model.
-        The style should reflect: {req.style}.
-        Focus on high-resolution illustration quality, clean composition, vivid colors, and natural facial detail. Return only the refined prompt.
-
-        Input: {req.prompt}
-        """ # """ ... """を使うと複数行の文字列を定義できる
-        
-        response = model.generate_content(prompt)
-        result = response.text.strip() #  文字列の先頭と末尾から空白や改行文字などの不要な「空白系文字」を取り除く
-
-        return AdjustPromptResponse(adjusted_prompt=result)
-
-    except Exception as e:
-        return JSONResponse(status_code=500, content={ "error": str(e), "trace": traceback.format_exc() })
-
-# ============================
-# 通常画像生成API（Geminiプロンプト補正付き）
-# ============================
-
-@app.post("/api/full_generate", response_model=GenerateImageResponse)
-async def full_generate(req: GenerateImageRequest):
-    try:
-        model = genai.GenerativeModel("models/gemini-1.5-flash")
-        prompt = f"""
-        You are an expert in generating prompts for Stable Diffusion XL, using the AnythingXL model.
-
-        Convert the following Japanese image description into a high-quality English prompt for the img2img task.
-        Make the output a comma-separated list of visual tags and keywords (no full sentences).
-        Use the AnythingXL tag style (e.g., "1girl, long hair, blue eyes, school uniform, dynamic pose, masterpiece, high resolution").
-
-        Reflect the following style: {req.style}, fully rendered, complete, high quality
-        Keep structure and composition consistent with the input image.
-
-        Return only the comma-separated prompt, no extra explanation.
-
-        Input: {req.prompt}
-        """
-        gemini_response = model.generate_content(prompt)
-        adjusted_prompt = gemini_response.text.strip()
-
-        await httpx.AsyncClient().post(f"{STABLE_DIFFUSION_API}/sdapi/v1/options", json={
-            "sd_model_checkpoint": ANYTHING_MODEL_NAME
-        })
-
-        payload = {
-            "prompt": adjusted_prompt,
-            "steps": req.steps,
-            "width": req.width,
-            "height": req.height,
-            "sampler_name": "DPM++ 2M Karras"
-        }
-
-        async with httpx.AsyncClient(timeout=httpx.Timeout(600.0)) as client:
-            response = await client.post(f"{STABLE_DIFFUSION_API}/sdapi/v1/txt2img", json=payload)
-            result = response.json()
-
-        if "images" not in result:
-            return JSONResponse(status_code=500, content={ "error": "WebUI returned invalid response", "raw_response": result })
-
-        image_data = base64.b64decode(result["images"][0])
-        filename = f"{uuid.uuid4()}.png"
-        file_path = os.path.join("images", filename)
-
-        with open(file_path, "wb") as f:
-            f.write(image_data)
-
-        image_url = f"http://localhost:8000/images/{filename}"
-        return GenerateImageResponse(image_url=image_url, adjusted_prompt=adjusted_prompt)
-
     except Exception as e:
         return JSONResponse(status_code=500, content={ "error": str(e), "trace": traceback.format_exc() })
 
@@ -385,12 +309,12 @@ async def masked_full_generate(req: MaskedGenerateRequest):
             "prompt": adjusted_prompt,
             "init_images": [original_image],
             "mask": mask_image,
-            "inpainting_fill": 1,
+            "inpainting_fill": 1,  # 1: original（塗りつぶしなし）
             "steps": req.steps,
             "width": req.width,
             "height": req.height,
             "sampler_name": "DPM++ 2M Karras",
-            "denoising_strength": 0.35,  # より元画像保持
+            "denoising_strength": 0.35,  # 元画像保持ぎみ
             "inpaint_full_res": True,  # 画像全体の解像度でマスク部を処理
             "inpaint_full_res_padding": 32
         }
@@ -420,7 +344,7 @@ async def masked_full_generate(req: MaskedGenerateRequest):
 # ============================
 
 @app.post("/api/img2img_full_generate", response_model=GenerateImageResponse)
-async def img2img_full_generate(req: Image2ImageGenerateRequest):  # MaskedGenerateRequestをそのまま使います
+async def img2img_full_generate(req: Image2ImageGenerateRequest):
     try:
         # Geminiによるプロンプト補正
         model = genai.GenerativeModel("models/gemini-1.5-flash")
@@ -450,7 +374,7 @@ async def img2img_full_generate(req: Image2ImageGenerateRequest):  # MaskedGener
             "height": req.height,
             "sampler_name": "DPM++ 2M Karras",
             "denoising_strength": 0.6,
-            "inpainting_fill": 1  # img2imgでもこのフィールドが必要な場合あり
+            "inpainting_fill": 1
         }
 
         async with httpx.AsyncClient(timeout=httpx.Timeout(600.0)) as client:
