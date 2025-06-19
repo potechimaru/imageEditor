@@ -19,7 +19,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 # ============================
 # 環境変数読み込み
 # ============================
-dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
+dotenv_path = os.path.join(os.path.dirname(__file__), "../.env")
 load_dotenv(dotenv_path)
 
 # GeminiAPI設定
