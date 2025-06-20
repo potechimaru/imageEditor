@@ -14,5 +14,5 @@ COPY . .
 # ポート開放
 EXPOSE 8000
 
-# Uvicornで起動
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# ホットリロード有効
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app"]

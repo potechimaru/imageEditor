@@ -12,9 +12,10 @@ interface Props {
   style: string;
   generatedPrompt: string;
   setGeneratedPrompt: Dispatch<SetStateAction<string>>;
+  userId: string;
 }
 
-const Img2ImgPromptInput = ({ setExportedUrls, originalUrl, steps, width, height, style,  generatedPrompt, setGeneratedPrompt}: Props) => {
+const Img2ImgPromptInput = ({ setExportedUrls, originalUrl, steps, width, height, style,  generatedPrompt, setGeneratedPrompt, userId}: Props) => {
   const [message, setMessage] = useState('');
 
   const fetchImageAsBase64 = async (url: string): Promise<string> => {
@@ -53,6 +54,7 @@ const Img2ImgPromptInput = ({ setExportedUrls, originalUrl, steps, width, height
           width,
           height,
           style,
+          userId,
         }),
       });
 

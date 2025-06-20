@@ -10,9 +10,10 @@ interface Props {
   style: string;
   generatedPrompt: string;
   setGeneratedPrompt: Dispatch<SetStateAction<string>>;
+  userId: string;
 }
 
-const PromptInput = ({ setExportedUrls, steps, width, height, style,  generatedPrompt, setGeneratedPrompt}: Props) => {
+const PromptInput = ({ setExportedUrls, steps, width, height, style,  generatedPrompt, setGeneratedPrompt, userId}: Props) => {
   const [message, setMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,6 +29,7 @@ const PromptInput = ({ setExportedUrls, steps, width, height, style,  generatedP
           width: width,
           height: height,
           style: style,
+          user_id: userId,
         }),
       });
 

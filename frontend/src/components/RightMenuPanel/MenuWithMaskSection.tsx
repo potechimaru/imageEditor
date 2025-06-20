@@ -17,11 +17,12 @@ interface Props{
     setExportedUrls: Dispatch<SetStateAction<string[]>>;
     generatedPrompt: string;
     setGeneratedPrompt: Dispatch<SetStateAction<string>>;
+    userId : string; 
 }
 
 const sections = ['original', 'img2img', 'addMask'] as const;
 
-const MenuWithMaskSection = ({previewUrls, exportedUrls, rightPanelCurrentIndex, setRightPanelCurrentIndex, maskedUrls, setExportedUrls, generatedPrompt, setGeneratedPrompt}: Props) => {
+const MenuWithMaskSection = ({previewUrls, exportedUrls, rightPanelCurrentIndex, setRightPanelCurrentIndex, maskedUrls, setExportedUrls, generatedPrompt, setGeneratedPrompt, userId}: Props) => {
   const [isDisplayOriginalSelecter, setIsDisplayOriginalSelecter] = useState(false);
   const [isDisplayMaskSelecter, setIsDisplayMaskSelecter] = useState(false);
   const [isShowImportedImage, setIsShowImportedImage] = useState(false);
@@ -259,7 +260,7 @@ const MenuWithMaskSection = ({previewUrls, exportedUrls, rightPanelCurrentIndex,
             </div>
         )}
         <WithMaskPromptInput originalUrl={originalUrl} maskUrl={maskUrl} setExportedUrls={setExportedUrls} steps={steps} width={width} height={height} style={selectedStyle} generatedPrompt={generatedPrompt}
-        setGeneratedPrompt={setGeneratedPrompt}/>
+        setGeneratedPrompt={setGeneratedPrompt} userId={userId}/>
     </div>
 
     

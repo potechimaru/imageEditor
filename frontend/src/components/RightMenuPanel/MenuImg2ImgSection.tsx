@@ -15,6 +15,7 @@ interface Props {
   setExportedUrls: Dispatch<SetStateAction<string[]>>;
   setGeneratedPrompt: Dispatch<SetStateAction<string>>;
   generatedPrompt: string;
+  userId: string;
 }
 
 const MenuImg2ImgSection = ({
@@ -24,7 +25,8 @@ const MenuImg2ImgSection = ({
   generatedPrompt,
   setRightPanelCurrentIndex,
   setExportedUrls,
-  setGeneratedPrompt
+  setGeneratedPrompt,
+  userId
 }: Props) => {
   const [isDisplayOriginalSelecter, setIsDisplayOriginalSelecter] = useState(false);
   const [isShowImportedImage, setIsShowImportedImage] = useState(false);
@@ -232,7 +234,7 @@ const MenuImg2ImgSection = ({
         style={selectedStyle}
         generatedPrompt={generatedPrompt}
         setGeneratedPrompt={setGeneratedPrompt}
-
+        userId={userId}
       />
     </div>
   );

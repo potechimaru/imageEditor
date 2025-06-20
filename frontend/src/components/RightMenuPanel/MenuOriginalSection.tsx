@@ -11,11 +11,12 @@ interface Props{
     setExportedUrls: Dispatch<SetStateAction<string[]>>;
     generatedPrompt: string;
     setGeneratedPrompt: Dispatch<SetStateAction<string>>;
+    userId: string;
 }
 
 const sections = ['original', 'img2img', 'addMask'] as const;
 
-const MenuOriginalSection = ({rightPanelCurrentIndex, setRightPanelCurrentIndex, setExportedUrls, generatedPrompt, setGeneratedPrompt}: Props) => {
+const MenuOriginalSection = ({rightPanelCurrentIndex, setRightPanelCurrentIndex, setExportedUrls, generatedPrompt, setGeneratedPrompt, userId}: Props) => {
 
   const [selectedStyle, setSelectedStyle] = useState("anime style, vibrant colors")
   const [steps, setSteps] = useState(20);
@@ -111,6 +112,7 @@ const MenuOriginalSection = ({rightPanelCurrentIndex, setRightPanelCurrentIndex,
           style={selectedStyle}
           generatedPrompt={generatedPrompt}
           setGeneratedPrompt={setGeneratedPrompt}
+          userId={userId}
         /> {/*プロンプトを入力する欄*/}
     </div>
   )
